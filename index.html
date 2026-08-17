@@ -790,7 +790,7 @@
 
       <div class="view-actions">
         <button class="btn btn-outline" onclick="goToStep(1)">← Atrás</button>
-        <button class="btn btn-primary" onclick="goToStep(3)">Continuar a preparación →</button>
+        <button class="btn btn-primary" onclick="goToPreparacionValidado()">Continuar a preparación →</button>
       </div>
     </div>
   </section>
@@ -1101,6 +1101,8 @@
           <textarea id="f-info-pendiente"></textarea>
         </div>
       </div>
+
+      <div id="encuestas-error" class="not-found" style="margin-top:8px;display:none;">Debes completar todas las preguntas de las escalas SEMCD-S y de Autoeficacia (VIII) antes de generar el documento.</div>
 
       <div class="view-actions">
         <button class="btn btn-outline" onclick="goToStep(2)">← Atrás</button>
@@ -1490,6 +1492,32 @@
     return obs.includes('anemia') || (hb !== null && hb < 11);
   }
 
+  // ---------- Validación al salir del Paso 2 (nutrición) ----------
+  function goToPreparacionValidado(){
+    if(!currentPatient){ goToStep(1); return; }
+
+    const hasAnemia = patientHasAnemia(currentPatient);
+    const nutricionText = document.getElementById('f-diagnostico-tratamiento-nutricional').value.trim();
+    const errorBox = document.getElementById('nutricion-error');
+
+    if(hasAnemia && !nutricionText){
+      if(errorBox){ errorBox.style.display = 'block'; }
+      document.getElementById('f-diagnostico-tratamiento-nutricional').focus();
+      document.getElementById('f-diagnostico-tratamiento-nutricional').scrollIntoView({ behavior:'smooth', block:'center' });
+      return;
+    }
+
+    if(errorBox){ errorBox.style.display = 'none'; }
+    goToStep(3);
+  }
+
+  // ---------- Validación al generar el documento (Paso 3 → Paso 4) ----------
+  function allSurveysAnswered(){
+    const semcdOk = SEMCD_QUESTIONS.every((_, i) => document.querySelector(`input[name="semcd_${i+1}"]:checked`));
+    const autoOk = AUTOCUIDADO_QUESTIONS.every((_, i) => document.querySelector(`input[name="autocuidado_${i+1}"]:checked`));
+    return semcdOk && autoOk;
+  }
+
   function renderNutricionTable(patient){
     const rows = patient.nutricionEvolucion.map((r, idx) => `
       <tr>
@@ -1791,19 +1819,16 @@
   function generateDocument(){
     if(!currentPatient){ goToStep(1); return; }
 
-    const hasAnemia = patientHasAnemia(currentPatient);
-    const nutricionText = document.getElementById('f-diagnostico-tratamiento-nutricional').value.trim();
-    const errorBox = document.getElementById('nutricion-error');
-
-    if(hasAnemia && !nutricionText){
-      if(errorBox){
-        errorBox.style.display = 'block';
+    if(!allSurveysAnswered()){
+      const errBox = document.getElementById('encuestas-error');
+      if(errBox){
+        errBox.style.display = 'block';
+        errBox.scrollIntoView({ behavior:'smooth', block:'center' });
       }
-      document.getElementById('f-diagnostico-tratamiento-nutricional').focus();
       return;
     }
-
-    if(errorBox){ errorBox.style.display = 'none'; }
+    const errBox = document.getElementById('encuestas-error');
+    if(errBox){ errBox.style.display = 'none'; }
 
     const p = currentPatient;
     const motivo = document.getElementById('f-motivo').value || "Paciente próximo a cumplir la mayoría de edad, requiere continuidad de tratamiento en servicio de adultos.";
